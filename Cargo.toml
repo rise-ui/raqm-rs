@@ -4,5 +4,5 @@ version = "0.1.0"
 authors = ["Mike Lubinets <lubinetsm@yandex.ru>"]
 
 [dependencies]
-raqm-sys = "0.1.0"
+raqm-sys = "0.2.1"
 failure = "0.1.1"
