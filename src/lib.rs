@@ -19,22 +19,14 @@ pub type Result<T> = ::std::result::Result<T, RaqmError>;
 
 // Import functions
 use raqm_sys::{
-    raqm_create, raqm_destroy,
-    raqm_add_font_feature,
-    raqm_set_language, raqm_set_par_direction, raqm_set_text, raqm_set_text_utf8,
-    raqm_set_freetype_face,
-    raqm_set_freetype_face_range,
-    raqm_set_freetype_load_flags,
-    raqm_layout,
-    raqm_get_glyphs,
-    raqm_index_to_position,
-    raqm_position_to_index,
+    raqm_add_font_feature, raqm_create, raqm_destroy, raqm_get_glyphs, raqm_index_to_position,
+    raqm_layout, raqm_position_to_index, raqm_set_freetype_face, raqm_set_freetype_face_range,
+    raqm_set_freetype_load_flags, raqm_set_language, raqm_set_par_direction, raqm_set_text,
+    raqm_set_text_utf8,
 };
 
 // Import types
-use raqm_sys::{
-    raqm_t, raqm_glyph_t, FT_Face,
-};
+use raqm_sys::{raqm_glyph_t, raqm_t, FT_Face};
 
 use std::borrow::Borrow;
 
@@ -68,18 +60,18 @@ impl Raqm {
     /// The text should typically represent a full paragraph,
     /// since doing the layout of chunks of text separately can give improper output.
     pub fn set_text_utf32(&mut self, text: &[u32]) -> Result<()> {
-        check_success!(
-            unsafe { raqm_set_text(self.ptr, text.as_ptr(), text.len()) }
-        )
+        check_success!(unsafe {
+            raqm_set_text(self.ptr, text.as_ptr(), text.len())
+        })
     }
 
     /// Same as Raqm::set_text_utf32(), but for text encoded in UTF-8 encoding.
     // TODO: intoduce Text type with builder for faces and lang ranges initialization
     // TODO: through one type + one set_text method
     pub fn set_text(&mut self, text: &str) -> Result<()> {
-        check_success!(
-            unsafe { raqm_set_text_utf8(self.ptr, text.as_ptr() as *const i8, text.len()) }
-        )
+        check_success!(unsafe {
+            raqm_set_text_utf8(self.ptr, text.as_ptr() as *const i8, text.len())
+        })
     }
 
     /// Sets the paragraph direction, also known as block direction in CSS.
@@ -99,9 +91,9 @@ impl Raqm {
     /// text in vertical text, instead everything is treated as vertical text.
     pub fn set_par_direction(&mut self, direction: Direction) -> Result<()> {
         let direction = direction as u32;
-        check_success!(
-            unsafe { raqm_set_par_direction(self.ptr, direction) }
-        )
+        check_success!(unsafe {
+            raqm_set_par_direction(self.ptr, direction)
+        })
     }
 
     /// Sets a BCP47 language code to be used for len -number of characters staring at start.
@@ -109,16 +101,16 @@ impl Raqm {
     ///
     /// This method can be used repeatedly to set different languages for different parts of the text.
     pub fn set_language(&mut self, lang_code: &str, start: usize, end: usize) -> Result<()> {
-        check_success!(
-            unsafe { raqm_set_language(self.ptr, lang_code.as_ptr() as *const i8, start, end) }
-        )
+        check_success!(unsafe {
+            raqm_set_language(self.ptr, lang_code.as_ptr() as *const i8, start, end)
+        })
     }
 
     /// Sets an FT_Face to be used for all characters in rq
     pub fn set_freetype_face(&mut self, face: FT_Face) -> Result<()> {
-        check_success!(
-            unsafe { raqm_set_freetype_face(self.ptr, face) }
-        )
+        check_success!(unsafe {
+            raqm_set_freetype_face(self.ptr, face)
+        })
     }
 
     /// Sets an FT_Face to be used for len -number of characters staring at start.
@@ -126,10 +118,15 @@ impl Raqm {
     ///
     /// This method can be used repeatedly to set different faces for different parts of the text.
     /// It is the responsibility of the client to make sure that face ranges cover the whole text.
-    pub fn set_freetype_face_range(&mut self, face: FT_Face, start: usize, end: usize) -> Result<()> {
-        check_success!(
-            unsafe { raqm_set_freetype_face_range(self.ptr, face, start, end) }
-        )
+    pub fn set_freetype_face_range(
+        &mut self,
+        face: FT_Face,
+        start: usize,
+        end: usize,
+    ) -> Result<()> {
+        check_success!(unsafe {
+            raqm_set_freetype_face_range(self.ptr, face, start, end)
+        })
     }
 
     /// Sets the load flags passed to FreeType when loading glyphs, should be the same flags used by
@@ -138,9 +135,9 @@ impl Raqm {
     /// This requires version of HarfBuzz that has hb_ft_font_set_load_flags(), for older version the flags will be ignored.
     // TODO: make a flags enum/builder, c-style frags in public interface are nightmare
     pub fn set_freetype_load_flags(&mut self, flags: i32) -> Result<()> {
-        check_success!(
-            unsafe { raqm_set_freetype_load_flags(self.ptr, flags) }
-        )
+        check_success!(unsafe {
+            raqm_set_freetype_load_flags(self.ptr, flags)
+        })
     }
 
     /// Adds a font feature to be used by the raqm_t during text layout. This is usually used to turn
@@ -152,20 +149,19 @@ impl Raqm {
     /// This function can be called repeatedly, new features will be appended to the end of the
     /// features list and can potentially override previous features.
     pub fn add_font_feature(&mut self, feature: &str, len: usize) -> Result<()> {
-        check_success!(
-            unsafe { raqm_add_font_feature(self.ptr, feature.as_ptr() as *const i8, len as c_int) }
-        )
+        check_success!(unsafe {
+            raqm_add_font_feature(self.ptr, feature.as_ptr() as *const i8, len as c_int)
+        })
     }
 
     /// Run the text layout process on Ramq. This is the main Raqm function where the
     /// Unicode Bidirectional Text algorithm will be applied to the text in Ramq, text shaping,
     /// and any other part of the layout process.
     pub fn layout(&mut self) -> Result<()> {
-        check_success!(
-            unsafe { raqm_layout(self.ptr) }
-        )
+        check_success!(unsafe {
+            raqm_layout(self.ptr)
+        })
     }
-
 
     /// Gets the final result of Raqm layout process, an array of `Glyph`s containing the glyph indices in the font,
     /// their positions and other possible information.
@@ -174,9 +170,7 @@ impl Raqm {
 
         let (array_ptr, len) = self.get_glyphs_mut_ptr()?;
 
-        let glyphs = unsafe {
-            slice::from_raw_parts_mut(array_ptr, len)
-        };
+        let glyphs = unsafe { slice::from_raw_parts_mut(array_ptr, len) };
 
         let glyphs = glyphs.into_iter()
             .map(Glyph::from)
@@ -198,7 +192,6 @@ impl Raqm {
         }
     }
 
-
     /// Calculates the cursor position after the character at index . If the character is right-to-left,
     /// then the cursor will be at the left of it, whereas if the character is left-to-right,
     /// then the cursor will be at the right of it.
@@ -210,21 +203,19 @@ impl Raqm {
         let mut x: c_int = 0;
         let mut y: c_int = 0;
 
-        let result = check_success!(
-            unsafe {
-                raqm_index_to_position(
-                    self.ptr,
-                    &mut index as *mut usize,
-                    &mut x as *mut c_int,
-                    &mut y as *mut c_int
-                )
-            }
-        );
+        let result = check_success!(unsafe {
+            raqm_index_to_position(
+                self.ptr,
+                &mut index as *mut usize,
+                &mut x as *mut c_int,
+                &mut y as *mut c_int,
+            )
+        });
 
         result.map(|_| Position {
             index,
             x: x as i32,
-            y: y as i32
+            y: y as i32,
         })
     }
 
@@ -233,21 +224,13 @@ impl Raqm {
     pub fn position_to_index(&mut self, x: i32, y: i32) -> Result<usize> {
         let mut index: usize = 0;
 
-        let result = check_success!(
-            unsafe {
-                raqm_position_to_index(
-                    self.ptr,
-                    x as c_int,
-                    y as c_int,
-                    &mut index as *mut usize
-                )
-            }
-        );
+        let result = check_success!(unsafe {
+            raqm_position_to_index(self.ptr, x as c_int, y as c_int, &mut index as *mut usize)
+        });
 
         result.map(|_| index)
     }
 }
-
 
 impl Drop for Raqm {
     fn drop(&mut self) {
@@ -269,7 +252,7 @@ pub struct Position {
     /// output x position
     pub x: i32,
     /// output y position
-    pub y: i32
+    pub y: i32,
 }
 
 /// The structure that holds information about output glyphs, returned from Raqm::get_glyphs().
