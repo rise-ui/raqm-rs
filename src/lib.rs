@@ -3,12 +3,13 @@ extern crate failure;
 extern crate raqm_sys;
 
 use std::os::raw::c_int;
-use std::mem;
 
 #[derive(Debug, Fail)]
 pub enum RaqmError {
     #[fail(display = "raqm_create() returned NULL")]
     CreateFailed,
+    #[fail(display = "raqm_get_glyphs() returned NULL")]
+    GetGlyphsFailed,
     // TODO: sensible errors if that's possible with libraqm
     #[fail(display = "libraqm error")]
     Failed,
@@ -18,7 +19,8 @@ pub type Result<T> = ::std::result::Result<T, RaqmError>;
 
 // Import functions
 use raqm_sys::{
-    raqm_add_font_feature, raqm_create, raqm_destroy, raqm_reference,
+    raqm_create, raqm_destroy,
+    raqm_add_font_feature,
     raqm_set_language, raqm_set_par_direction, raqm_set_text, raqm_set_text_utf8,
     raqm_set_freetype_face,
     raqm_set_freetype_face_range,
@@ -31,8 +33,10 @@ use raqm_sys::{
 
 // Import types
 use raqm_sys::{
-    raqm_t, raqm_direction_t, raqm_glyph_t, FT_Face,
+    raqm_t, raqm_glyph_t, FT_Face,
 };
+
+use std::borrow::Borrow;
 
 macro_rules! check_success {
     ($code:expr) => {
@@ -162,6 +166,39 @@ impl Raqm {
         )
     }
 
+
+    /// Gets the final result of Raqm layout process, an array of `Glyph`s containing the glyph indices in the font,
+    /// their positions and other possible information.
+    pub fn glyphs(&mut self) -> Result<Vec<Glyph>> {
+        use std::slice;
+
+        let (array_ptr, len) = self.get_glyphs_mut_ptr()?;
+
+        let glyphs = unsafe {
+            slice::from_raw_parts_mut(array_ptr, len)
+        };
+
+        let glyphs = glyphs.into_iter()
+            .map(Glyph::from)
+            .collect();
+
+        Ok(glyphs)
+    }
+
+    fn get_glyphs_mut_ptr(&mut self) -> Result<(*mut raqm_glyph_t, usize)> {
+        let mut glyphs_array_len: usize = 0;
+        let glyphs_array: *mut raqm_glyph_t = unsafe {
+            raqm_get_glyphs(self.ptr, &mut glyphs_array_len as *mut usize)
+        };
+
+        if !glyphs_array.is_null() {
+            Ok((glyphs_array, glyphs_array_len))
+        } else {
+            Err(RaqmError::GetGlyphsFailed)
+        }
+    }
+
+
     /// Calculates the cursor position after the character at index . If the character is right-to-left,
     /// then the cursor will be at the left of it, whereas if the character is left-to-right,
     /// then the cursor will be at the right of it.
@@ -227,7 +264,43 @@ pub enum Direction {
 
 /// Raqm position, representing an index, x and y.
 pub struct Position {
+    /// character index
     pub index: usize,
+    /// output x position
     pub x: i32,
+    /// output y position
     pub y: i32
+}
+
+/// The structure that holds information about output glyphs, returned from Raqm::get_glyphs().
+pub struct Glyph {
+    /// the index of the glyph in the font file.
+    pub index: u32,
+    /// the glyph advance width in horizontal text.
+    pub x_advance: i32,
+    /// the glyph advance width in vertical text.
+    pub y_advance: i32,
+    /// the horizontal movement of the glyph from the current point.
+    pub x_offset: i32,
+    /// the vertical movement of the glyph from the current point.
+    pub y_offset: i32,
+    /// the index of original character in input text.
+    pub cluster: u32,
+    /// the FT_Face of the glyph.
+    pub face: FT_Face,
+}
+
+impl<T: Borrow<raqm_glyph_t>> From<T> for Glyph {
+    fn from(glyph: T) -> Self {
+        let glyph = glyph.borrow();
+        Glyph {
+            index: glyph.index as u32,
+            x_advance: glyph.x_advance as i32,
+            y_advance: glyph.y_advance as i32,
+            x_offset: glyph.x_offset as i32,
+            y_offset: glyph.y_offset as i32,
+            cluster: glyph.cluster,
+            face: glyph.ftface,
+        }
+    }
 }
