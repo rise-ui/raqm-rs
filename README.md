@@ -13,7 +13,7 @@ git checkout v0.5.0
 ```
 Then proceed with the install instructions in the [libraqm repo README.md](https://github.com/HOST-Oman/libraqm/tree/v0.5.0).
 
-#### Install from source repo
+#### Install from repository
 Use your distribution package manager to download and install the `libraqm`
 ##### Arch Linux
 ```bash
