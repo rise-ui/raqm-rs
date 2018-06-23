@@ -2,6 +2,11 @@
 name = "raqm"
 version = "0.1.0"
 authors = ["Mike Lubinets <lubinetsm@yandex.ru>"]
+description = "libraqm Rust bindings"
+repository = "https://github.com/rise-ui/raqm-rs"
+keywords = ["rise", "rist-ui", "raqm", "binding", "layout"]
+categories = ["external-ffi-bindings", "gui"]
+license = "MIT"
 
 [dependencies]
 raqm-sys = "0.2.1"
