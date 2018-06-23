@@ -3,6 +3,7 @@ extern crate failure;
 extern crate raqm_sys;
 
 use std::os::raw::c_int;
+use std::mem;
 
 #[derive(Debug, Fail)]
 pub enum RaqmError {
@@ -49,7 +50,7 @@ pub struct Raqm {
 
 impl Raqm {
     /// Creates a new raqm_t with all its internal states initialized to their defaults.
-    fn new() -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let ptr: *mut raqm_t = unsafe { raqm_create() };
         if !ptr.is_null() {
             Ok(Raqm { ptr })
@@ -80,19 +81,19 @@ impl Raqm {
     /// Sets the paragraph direction, also known as block direction in CSS.
     /// For horizontal text, this controls the overall direction in the Unicode Bidirectional Algorithm,
     /// so when the text is mainly right-to-left (with or without some left-to-right) text,
-    /// then the base direction should be set to RaqmDirection::RightToLeft and vice versa.
+    /// then the base direction should be set to Direction::RightToLeft and vice versa.
     ///
-    /// The default is RaqmDirection::Default, which determines the paragraph direction based on the
+    /// The default is Direction::Default, which determines the paragraph direction based on the
     /// first character with strong bidi type (see rule P2 in Unicode Bidirectional Algorithm),
     /// which can be good enough for many cases but has problems when a mainly right-to-left paragraph
     /// starts with a left-to-right character and vice versa as the detected paragraph direction will be the wrong one,
     /// or when text does not contain any characters with string bidi types (e.g. only punctuation or numbers)
     /// as this will default to left-to-right paragraph direction.
     ///
-    /// For vertical, top-to-bottom text, RaqmDirection::TopToBottom should be used.
+    /// For vertical, top-to-bottom text, Direction::TopToBottom should be used.
     /// Raqm, however, provides limited vertical text support and does not handle rotated horizontal
     /// text in vertical text, instead everything is treated as vertical text.
-    pub fn set_par_direction(&mut self, direction: RaqmDirection) -> Result<()> {
+    pub fn set_par_direction(&mut self, direction: Direction) -> Result<()> {
         let direction = direction as u32;
         check_success!(
             unsafe { raqm_set_par_direction(self.ptr, direction) }
@@ -152,25 +153,81 @@ impl Raqm {
         )
     }
 
-    /// Run the text layout process on rq . This is the main Raqm function where the
-    /// Unicode Bidirectional Text algorithm will be applied to the text in rq, text shaping,
+    /// Run the text layout process on Ramq. This is the main Raqm function where the
+    /// Unicode Bidirectional Text algorithm will be applied to the text in Ramq, text shaping,
     /// and any other part of the layout process.
     pub fn layout(&mut self) -> Result<()> {
         check_success!(
             unsafe { raqm_layout(self.ptr) }
         )
     }
+
+    /// Calculates the cursor position after the character at index . If the character is right-to-left,
+    /// then the cursor will be at the left of it, whereas if the character is left-to-right,
+    /// then the cursor will be at the right of it.
+    ///
+    /// Note: index is specified as `inout` parameter, so the resulting `Position::index` may be
+    /// different from the input value
+    pub fn index_to_position(&mut self, index: usize) -> Result<Position> {
+        let mut index = index;
+        let mut x: c_int = 0;
+        let mut y: c_int = 0;
+
+        let result = check_success!(
+            unsafe {
+                raqm_index_to_position(
+                    self.ptr,
+                    &mut index as *mut usize,
+                    &mut x as *mut c_int,
+                    &mut y as *mut c_int
+                )
+            }
+        );
+
+        result.map(|_| Position {
+            index,
+            x: x as i32,
+            y: y as i32
+        })
+    }
+
+    /// Returns the index of the character at x and y position within text.
+    /// If the position is outside the text, the last character is chosen as index.
+    pub fn position_to_index(&mut self, x: i32, y: i32) -> Result<usize> {
+        let mut index: usize = 0;
+
+        let result = check_success!(
+            unsafe {
+                raqm_position_to_index(
+                    self.ptr,
+                    x as c_int,
+                    y as c_int,
+                    &mut index as *mut usize
+                )
+            }
+        );
+
+        result.map(|_| index)
+    }
 }
 
-pub enum RaqmDirection {
+
+impl Drop for Raqm {
+    fn drop(&mut self) {
+        unsafe { raqm_destroy(self.ptr) }
+    }
+}
+
+pub enum Direction {
     Default = raqm_sys::raqm_direction_t_RAQM_DIRECTION_DEFAULT as isize,
     RightToLeft = raqm_sys::raqm_direction_t_RAQM_DIRECTION_RTL as isize,
     LeftToRight = raqm_sys::raqm_direction_t_RAQM_DIRECTION_LTR as isize,
     TopToBottom = raqm_sys::raqm_direction_t_RAQM_DIRECTION_TTB as isize,
 }
 
-impl Drop for Raqm {
-    fn drop(&mut self) {
-        unsafe { raqm_destroy(self.ptr) }
-    }
+/// Raqm position, representing an index, x and y.
+pub struct Position {
+    pub index: usize,
+    pub x: i32,
+    pub y: i32
 }
